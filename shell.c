@@ -1,56 +1,118 @@
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
+#include <string.h>
 #include <sys/wait.h>
 
-void searchFile(char *option, char *filename, char *pattern) {
-    FILE *fp = fopen(filename, "r");
-    if (!fp) { perror("Error opening file"); return; }
-
-    char line[1024];
-    int count = 0;
-    while (fgets(line, sizeof(line), fp)) {
-        char *ptr = line;
-        while ((ptr = strstr(ptr, pattern)) != NULL) {
-            count++;
-            if (option[0] == 'a') printf("%s", line);
-            ptr += strlen(pattern);
-        }
+void make_toks(char *s, char *tok[]) {
+    int i = 0;
+    char *p;
+    p = strtok(s, " ");
+    while (p != NULL) {
+        tok[i++] = p;
+        p = strtok(NULL, " ");
     }
-    if (option[0] == 'c') printf("Total occurrences: %d\n", count);
-    fclose(fp);
+    tok[i] = NULL;
 }
 
-int main() {
-    char input[200], *args[10];
+void search(char *fn,char op,char *pattern)
+{
+int fh,count=0,i=0,j=0;
+char buff[255],c,*p;
+fh=open(fn,O_RDONLY);
+if(fh==-1)
+{
+printf("file %s not found\n",fn);
+return;
 
-    while (1) {
-        printf("myshell$ ");
-        if (!fgets(input, sizeof(input), stdin)) break;
-        if (!(args[0] = strtok(input, " \t\n"))) continue;
+}
+switch(op)
+{
+case 'f':
+	while(read(fh,&c,1))
+	{
+	buff[j++]=c;
+	if(c=='\n')
+	{
+	buff[j]='\0';
+	j=0;
+	i++;
+	if(strstr(buff,pattern))
+	{
+	printf("%d : %s",i,buff);
+	break;
+	}
+	}
+	}
+	break;
+	
+case 'c':
+	while(read(fh,&c,1))
+	{
+	buff[j++]=c;
+	if(c=='\n')
+	{
+	buff[j]='\0';
+	j=0;
+	p=buff;
+	while(p=strstr(p,pattern))
+	{
+	count++;
+	p++;
+	}
+	}
+	}
+	printf("total no. of occurrence = %d\n",count);
+	break;
+	
+	
+case 'a': 
+	while(read(fh,&c,1))
+	{
+	buff[j++]=c;
+	if(c=='\n')
+	{
+	buff[j]='\0';
+	j=0;
+	i++;
+	if(strstr(buff,pattern))
+	printf("%d : %s",i,buff);
+	}
+	
+	}
+}
+close(fh);
+}
 
-        int i = 0;
-        while ((args[++i] = strtok(NULL, " \t\n")));
-
-        if (!strcmp(args[0], "exit")) break;
-
-        else if (!strcmp(args[0], "search")) {
-            if (args[1] && args[2] && args[3])
-                searchFile(args[1], args[2], args[3]);
+int main()
+{
+    char buff[80],*args[10];
+    int pid;
+    while(1)
+    {
+        printf("Myshell$");
+        fflush(stdin);
+        fgets(buff,80,stdin);
+        buff[strlen(buff)-1]='\0';
+        make_toks(buff,args);
+        if(strcmp(args[0],"search")==0)
+            search(args[3],args[1][0],args[2]);
+        else
+        {
+            pid=fork();
+            if(pid>0)
+                wait(NULL);
             else
-                printf("Usage: search a|c filename pattern\n");
-        }
-
-        else {
-            pid_t pid = fork();
-            if (pid == 0) {
-                execvp(args[0], args);
-                perror("Command not found");
-                exit(1);
-            } else wait(NULL);
+            {
+                if((execvp(args[0],args)==-1))
+                    printf("Bad Command\n");
+            }
         }
     }
-
     return 0;
-}
+    }
+
+
